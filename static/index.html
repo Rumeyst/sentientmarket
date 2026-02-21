@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SentientMarket — AI Reputation Oracle for Digital Twins</title>
+    <meta name="description"
+        content="Verifiable AI reputation scores for Twin.fun digital twins. Every judgment backed by TEE cryptographic proof on OpenGradient.">
+    <meta property="og:title" content="SentientMarket — AI Reputation Oracle">
+    <meta property="og:description"
+        content="Verifiable AI reputation scores for Twin.fun digital twins, powered by OpenGradient.">
+    <link rel="stylesheet" href="/static/style.css">
+    <link rel="icon"
+        href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🧠</text></svg>">
+    <script src="https://cdn.jsdelivr.net/npm/ethers@6.13.4/dist/ethers.umd.min.js"></script>
+</head>
+
+<body>
+    <div class="container">
+        <!-- Header -->
+        <header class="header animate-in" role="banner">
+            <div class="header-content">
+                <a href="/" class="logo" aria-label="SentientMarket home">
+                    <div class="logo-icon" aria-hidden="true">🧠</div>
+                    <div class="logo-text">
+                        <h1>SentientMarket</h1>
+                        <span>AI Reputation Oracle</span>
+                    </div>
+                </a>
+                <div class="header-actions">
+                    <div class="badge badge-coral"><span class="dot" aria-hidden="true"></span> TEE Verified</div>
+                    <div class="badge badge-warm"><span class="dot" aria-hidden="true"></span> MemSync</div>
+                    <div class="badge badge-navy" id="badge-status">Loading...</div>
+                    <button class="btn-wallet" id="connect-wallet" aria-label="Connect wallet" tabindex="0">
+                        <span class="wallet-icon" aria-hidden="true">🦊</span>
+                        <span class="wallet-label">Connect Wallet</span>
+                    </button>
+                    <button class="theme-toggle" id="theme-toggle" aria-label="Toggle dark mode"
+                        tabindex="0">☀️</button>
+                </div>
+            </div>
+        </header>
+
+        <!-- Wallet Banner (hidden until connected) -->
+        <div class="wallet-banner" id="wallet-banner" style="display: none;" role="status" aria-live="polite">
+            <div class="wallet-banner-left">
+                <span class="wallet-banner-dot" aria-hidden="true"></span>
+                <span class="wallet-banner-addr" id="wallet-address"></span>
+                <span class="wallet-banner-network" id="wallet-network"></span>
+            </div>
+            <button class="wallet-banner-disconnect" id="disconnect-wallet"
+                aria-label="Disconnect wallet">Disconnect</button>
+        </div>
+
+        <!-- Stats -->
+        <section class="stats-row" aria-label="Summary statistics">
+            <div class="stat-card animate-in animate-delay-1">
+                <div class="stat-label">Tracked Twins</div>
+                <div class="stat-value coral" id="stat-twins">—</div>
+            </div>
+            <div class="stat-card animate-in animate-delay-2">
+                <div class="stat-label">Avg Accuracy</div>
+                <div class="stat-value green" id="stat-accuracy">—</div>
+            </div>
+            <div class="stat-card animate-in animate-delay-3">
+                <div class="stat-label">Total Calls</div>
+                <div class="stat-value" id="stat-predictions">—</div>
+            </div>
+            <div class="stat-card animate-in animate-delay-4">
+                <div class="stat-label">On-Chain Proofs</div>
+                <div class="stat-value warm" id="stat-proofs">—</div>
+            </div>
+        </section>
+
+        <!-- Leaderboard -->
+        <section aria-label="Twin reputation leaderboard">
+            <div class="section-header animate-in">
+                <div>
+                    <h2 class="section-title">Reputation Leaderboard</h2>
+                    <p class="section-subtitle">Ranked by verified prediction accuracy — every score backed by TEE proof
+                    </p>
+                </div>
+            </div>
+
+            <div id="leaderboard-container" role="table" aria-label="Leaderboard">
+                <div class="loading">
+                    <div class="spinner" aria-hidden="true"></div>
+                    <div class="loading-text">Scoring twins with TEE-verified AI...</div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Footer -->
+        <footer class="footer" role="contentinfo">
+            <div class="footer-gradient" aria-hidden="true"></div>
+            <p>Built on <a href="https://opengradient.ai" target="_blank" rel="noopener noreferrer">OpenGradient</a> —
+                TEE-verified LLM · MemSync · On-chain Forecasts</p>
+            <p style="margin-top: 4px; opacity: 0.7;">Proofs verifiable on the <a
+                    href="https://explorer.opengradient.ai" target="_blank" rel="noopener noreferrer">block explorer</a>
+            </p>
+        </footer>
+    </div>
+
+    <script src="/static/app.js"></script>
+</body>
+
+</html>

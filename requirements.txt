@@ -1,0 +1,7 @@
+opengradient
+requests
+python-dotenv
+fastapi
+uvicorn[standard]
+jinja2
+aiofiles

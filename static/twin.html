@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Twin Profile — SentientMarket</title>
+    <meta name="description"
+        content="Detailed AI reputation profile with verified accuracy metrics and on-chain proof.">
+    <link rel="stylesheet" href="/static/style.css">
+    <link rel="icon"
+        href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🧠</text></svg>">
+    <script src="https://cdn.jsdelivr.net/npm/ethers@6.13.4/dist/ethers.umd.min.js"></script>
+</head>
+
+<body>
+    <div class="container">
+        <!-- Navigation -->
+        <nav class="detail-nav" aria-label="Breadcrumb">
+            <a href="/" class="back-link">← Leaderboard</a>
+            <div class="detail-nav-actions">
+                <button class="btn-wallet btn-wallet-sm" id="connect-wallet" aria-label="Connect wallet" tabindex="0">
+                    <span class="wallet-icon" aria-hidden="true">🦊</span>
+                    <span class="wallet-label">Connect</span>
+                </button>
+                <button class="theme-toggle" id="theme-toggle" aria-label="Toggle dark mode" tabindex="0">☀️</button>
+            </div>
+        </nav>
+
+        <!-- Wallet Banner -->
+        <div class="wallet-banner" id="wallet-banner" style="display: none;" role="status" aria-live="polite">
+            <div class="wallet-banner-left">
+                <span class="wallet-banner-dot" aria-hidden="true"></span>
+                <span class="wallet-banner-addr" id="wallet-address"></span>
+                <span class="wallet-banner-network" id="wallet-network"></span>
+            </div>
+            <button class="wallet-banner-disconnect" id="disconnect-wallet"
+                aria-label="Disconnect wallet">Disconnect</button>
+        </div>
+
+        <!-- Loading -->
+        <div id="twin-loading" class="loading" role="status" aria-live="polite">
+            <div class="spinner" aria-hidden="true"></div>
+            <div class="loading-text">Loading reputation profile...</div>
+        </div>
+
+        <!-- Content -->
+        <main id="twin-content" style="display: none;">
+            <!-- Header -->
+            <div class="detail-header animate-in">
+                <div class="detail-avatar" id="twin-avatar" aria-hidden="true"></div>
+                <div class="detail-info">
+                    <h1 id="twin-name"></h1>
+                    <p id="twin-bio"></p>
+                </div>
+            </div>
+
+            <!-- Stats -->
+            <section class="stats-row" aria-label="Twin statistics">
+                <div class="stat-card animate-in animate-delay-1">
+                    <div class="stat-label">Accuracy</div>
+                    <div class="stat-value green" id="detail-accuracy">—</div>
+                </div>
+                <div class="stat-card animate-in animate-delay-2">
+                    <div class="stat-label">Record (W/L)</div>
+                    <div class="stat-value" id="detail-record">—</div>
+                </div>
+                <div class="stat-card animate-in animate-delay-3">
+                    <div class="stat-label">Market Bias</div>
+                    <div class="stat-value" id="detail-bias">—</div>
+                </div>
+                <div class="stat-card animate-in animate-delay-4">
+                    <div class="stat-label">Risk Rating</div>
+                    <div class="stat-value" id="detail-risk">—</div>
+                </div>
+            </section>
+
+            <!-- Grid -->
+            <div class="detail-grid">
+                <!-- AI Analysis -->
+                <article class="card animate-in">
+                    <div class="card-title">🤖 AI Analysis <span
+                            style="font-family: var(--font-mono); font-size: 0.6rem; opacity: 0.6;">(TEE
+                            Verified)</span></div>
+                    <div class="narrative-box" id="detail-narrative">Loading analysis...</div>
+                    <div id="detail-strengths" style="margin-top: 14px;"></div>
+                    <div id="detail-weaknesses" style="margin-top: 10px;"></div>
+                    <a href="#" class="proof-link" id="proof-link" target="_blank" rel="noopener noreferrer">
+                        🔗 Verify on-chain →
+                    </a>
+                </article>
+
+                <!-- Accuracy Breakdown -->
+                <article class="card animate-in animate-delay-1">
+                    <div class="card-title">📊 Accuracy by Category</div>
+                    <div id="accuracy-bars"></div>
+                </article>
+            </div>
+
+            <!-- Prediction History -->
+            <article class="card animate-in animate-delay-2" style="margin-bottom: 32px;">
+                <div class="card-title">📋 Prediction History</div>
+                <div id="prediction-list" role="list"></div>
+            </article>
+        </main>
+
+        <!-- Footer -->
+        <footer class="footer" role="contentinfo">
+            <div class="footer-gradient" aria-hidden="true"></div>
+            <p>Built on <a href="https://opengradient.ai" target="_blank" rel="noopener noreferrer">OpenGradient</a></p>
+        </footer>
+    </div>
+
+    <script src="/static/app.js"></script>
+</body>
+
+</html>

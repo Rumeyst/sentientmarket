@@ -23,8 +23,10 @@ from reputation_engine import ReputationEngine
 
 app = FastAPI(title="SentientMarket", version="0.1.0")
 
-STATIC_DIR = Path(__file__).parent / "static"
-app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
+STATIC_DIR = Path(os.environ.get("STATIC_DIR", str(Path(__file__).parent / "static")))
+if STATIC_DIR.exists():
+    app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
+
 
 # Initialize engine
 og_sdk = get_og_client()

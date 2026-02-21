@@ -7,9 +7,13 @@ import sys
 import os
 
 # Add project root to Python path so imports resolve
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, ROOT)
 
-from server import app
+# Set the static dir env var so server.py knows where to find files
+os.environ.setdefault("STATIC_DIR", os.path.join(ROOT, "static"))
 
-# Vercel expects 'app' or 'handler' at module level
+from server import app  # noqa: E402
+
+# Vercel expects 'app' at module level
 # FastAPI is ASGI-compatible, Vercel handles it automatically

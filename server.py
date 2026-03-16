@@ -11,7 +11,7 @@ from fastapi import FastAPI, Request
 from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
-from config import Config, get_og_llm
+from config import Config
 from og_client import OGClient
 from memsync_client import MemSyncClient
 from twin_collector import TwinCollector
@@ -28,10 +28,8 @@ if STATIC_DIR.exists():
     app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
 
 
-# Initialize engine (og.LLM for x402 inference)
-og_llm = get_og_llm()
-og = OGClient(og_llm)
-
+# Initialize engine (SDK handles x402 internally when available)
+og = OGClient()
 memsync = MemSyncClient()
 collector = TwinCollector(demo_mode=True)
 engine = ReputationEngine(og=og, memsync=memsync, collector=collector)
@@ -42,9 +40,9 @@ async def startup():
     """Ingest demo data on startup."""
     issues = Config.validate()
     if issues:
-        print(f"[Server] Config issues (running in demo mode): {issues}")
+        print(f"[Server] Config notes: {issues}")
     engine.initialize()
-    print("[Server] SentientMarket ready!")
+    print(f"[Server] SentientMarket ready! (demo_mode={og.demo_mode})")
 
 
 # ---------------------------------------------------------------------------
@@ -81,7 +79,6 @@ async def api_twin_detail(twin_id: str):
     score = engine.score_twin(twin_id)
     if not score:
         return JSONResponse(content={"error": "Twin not found"}, status_code=404)
-    # Serialize for JSON (twin data may have non-serializable values)
     return JSONResponse(content={
         "twin": score["twin"],
         "accuracy": score["accuracy"],

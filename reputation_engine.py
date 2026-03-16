@@ -161,6 +161,66 @@ class ReputationEngine:
             count = self.pipeline.ingest_twin(twin)
             print(f"[Engine] Ingested {count} memories for {twin['name']}")
 
+    def get_twin_context(self, twin_id: str) -> Optional[dict]:
+        """
+        Build enriched context for a twin (for client-side x402 flow).
+        Returns { twin, accuracy, memory_context } without running LLM.
+        """
+        twin = self.collector.get_twin(twin_id)
+        if not twin:
+            return None
+
+        resolved = self.collector.get_resolved_predictions(twin_id)
+        accuracy = self.tracker.calculate_accuracy(resolved)
+        forecasts = self.og.get_forecasts()
+        memory_context = self.pipeline.get_memory_context(twin["name"])
+
+        enriched_context = (
+            f"{memory_context}\n\n"
+            f"Accuracy stats: {accuracy['accuracy_pct']}% ({accuracy['hits']}/{accuracy['total']})\n"
+            f"By asset: {json.dumps(accuracy['by_asset'])}\n"
+            f"Current OG model forecasts: {json.dumps({k: v.get('direction', v.get('raw', 'N/A')) for k, v in forecasts.items()})}"
+        )
+
+        return {
+            "twin": twin,
+            "accuracy": accuracy,
+            "memory_context": enriched_context,
+        }
+
+    def update_twin_score(self, twin_id: str, analysis_content: str, tx_hash: str) -> Optional[dict]:
+        """
+        Update a twin's cached score with client-side x402 results.
+        Called after the frontend completes the x402 payment flow.
+        """
+        twin = self.collector.get_twin(twin_id)
+        if not twin:
+            return None
+
+        resolved = self.collector.get_resolved_predictions(twin_id)
+        accuracy = self.tracker.calculate_accuracy(resolved)
+
+        try:
+            analysis = json.loads(analysis_content)
+        except (json.JSONDecodeError, TypeError):
+            analysis = {"narrative": analysis_content, "accuracy_pct": accuracy["accuracy_pct"]}
+
+        is_real_proof = tx_hash and not tx_hash.startswith("0xDEMO_")
+        explorer_url = f"https://explorer.opengradient.ai/tx/{tx_hash}" if is_real_proof else ""
+
+        score = {
+            "twin": twin,
+            "accuracy": accuracy,
+            "forecasts": self.og.get_forecasts(),
+            "ai_analysis": analysis,
+            "payment_hash": tx_hash,
+            "explorer_url": explorer_url,
+            "scored_at": int(time.time()),
+        }
+
+        self._cache[twin_id] = score
+        return score
+
     def score_twin(self, twin_id: str, force_refresh: bool = False) -> Optional[dict]:
         """
         Produce a full reputation score for a twin.
@@ -203,9 +263,18 @@ class ReputationEngine:
         except (json.JSONDecodeError, TypeError):
             analysis = {"narrative": result.get("analysis", "Analysis unavailable"), "accuracy_pct": accuracy["accuracy_pct"]}
 
-        # Build explorer URL for the proof
+        # Build proof info
         payment_hash = result.get("payment_hash", "")
-        explorer_url = f"https://explorer.opengradient.ai/tx/{payment_hash}" if payment_hash else None
+        tee_verified = result.get("tee_verified", False)
+        is_demo = not payment_hash or payment_hash.startswith("0xDEMO_")
+        is_onchain_tx = payment_hash.startswith("0x") and len(payment_hash) >= 66 and not is_demo
+        
+        if is_onchain_tx:
+            explorer_url = f"https://explorer.opengradient.ai/tx/{payment_hash}"
+        elif tee_verified and not is_demo:
+            explorer_url = f"tee://{payment_hash[:16]}"  # TEE proof, no explorer link
+        else:
+            explorer_url = ""
 
         score = {
             "twin": twin,

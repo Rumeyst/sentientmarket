@@ -45,6 +45,7 @@ const WalletManager = {
     signer: null,
     address: null,
     chainId: null,
+    onConnectCallbacks: [],
 
     init() {
         // Bind connect buttons
@@ -90,43 +91,40 @@ const WalletManager = {
             localStorage.setItem('sm-wallet-connected', 'true');
             this.updateUI();
 
-            // Prompt to switch to OG network if not already on it
-            if (this.chainId !== 10744) {
-                await this.switchToOGNetwork();
+            // Fire connect callbacks (e.g. re-render proof button)
+            this.onConnectCallbacks.forEach(cb => cb(this.address));
+
+            // Prompt to switch to Base Sepolia if not already on it
+            if (this.chainId !== 84532) {
+                await this.switchToBaseSepolia();
             }
         } catch (err) {
             if (!silent) console.error('Wallet connect failed:', err);
         }
     },
 
-    async switchToOGNetwork() {
+    async switchToBaseSepolia() {
+        const BASE_SEPOLIA_HEX = '0x14a34'; // 84532
         try {
-            // Fetch network config from our API
-            const res = await fetch('/api/network');
-            const config = await res.json();
-
-            try {
+            await window.ethereum.request({
+                method: 'wallet_switchEthereumChain',
+                params: [{ chainId: BASE_SEPOLIA_HEX }],
+            });
+        } catch (switchErr) {
+            if (switchErr.code === 4902) {
                 await window.ethereum.request({
-                    method: 'wallet_switchEthereumChain',
-                    params: [{ chainId: config.chainId }],
+                    method: 'wallet_addEthereumChain',
+                    params: [{
+                        chainId: BASE_SEPOLIA_HEX,
+                        chainName: 'Base Sepolia',
+                        rpcUrls: ['https://sepolia.base.org'],
+                        blockExplorerUrls: ['https://sepolia.basescan.org'],
+                        nativeCurrency: { name: 'ETH', symbol: 'ETH', decimals: 18 },
+                    }],
                 });
-            } catch (switchErr) {
-                // Chain not added yet — add it
-                if (switchErr.code === 4902) {
-                    await window.ethereum.request({
-                        method: 'wallet_addEthereumChain',
-                        params: [{
-                            chainId: config.chainId,
-                            chainName: config.chainName,
-                            rpcUrls: config.rpcUrls,
-                            blockExplorerUrls: config.blockExplorerUrls,
-                            nativeCurrency: config.nativeCurrency,
-                        }],
-                    });
-                }
             }
-
-            // Refresh after switch
+        }
+        try {
             const network = await this.provider.getNetwork();
             this.chainId = Number(network.chainId);
             this.updateUI();
@@ -149,7 +147,7 @@ const WalletManager = {
         const truncAddr = connected
             ? this.address.slice(0, 6) + '···' + this.address.slice(-4)
             : '';
-        const networkName = this.chainId === 10744 ? 'OpenGradient' : `Chain ${this.chainId || '?'}`;
+        const networkName = this.chainId === 84532 ? 'Base Sepolia' : `Chain ${this.chainId || '?'}`;
 
         // Update connect buttons
         document.querySelectorAll('#connect-wallet').forEach(btn => {
@@ -175,7 +173,7 @@ const WalletManager = {
 
         document.querySelectorAll('#wallet-network').forEach(el => {
             el.textContent = connected ? networkName : '';
-            el.style.color = this.chainId === 10744 ? '' : 'var(--yellow)';
+            el.style.color = this.chainId === 84532 ? '' : 'var(--yellow)';
         });
     },
 };
@@ -333,11 +331,21 @@ const loadTwinDetail = async () => {
         }
 
         const proofEl = document.getElementById('proof-link');
-        if (data.explorer_url && data.payment_hash) {
+        if (data.explorer_url && data.explorer_url.startsWith('https://')) {
+            // On-chain tx — link to explorer
             proofEl.href = data.explorer_url;
             proofEl.textContent = '🔗 Verify: ' + truncateHash(data.payment_hash) + ' →';
+            proofEl.style.cursor = 'pointer';
+            proofEl.style.opacity = '1';
+        } else if (data.payment_hash && !data.payment_hash.startsWith('0xDEMO_') && !data.payment_hash.startsWith('0xTEE_')) {
+            // TEE verified proof (no explorer link but real proof)
+            proofEl.removeAttribute('href');
+            proofEl.textContent = '✅ TEE Verified — proof: ' + truncateHash(data.payment_hash);
+            proofEl.style.cursor = 'default';
+            proofEl.style.opacity = '1';
+            proofEl.style.color = 'var(--green)';
         } else {
-            proofEl.textContent = '🔗 Connect wallet for live proofs';
+            proofEl.textContent = '🔒 Demo mode — set OG_PRIVATE_KEY for live proofs';
             proofEl.removeAttribute('href');
             proofEl.style.cursor = 'default';
             proofEl.style.opacity = '0.6';

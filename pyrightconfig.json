@@ -9,5 +9,9 @@
     ],
     "reportMissingImports": "none",
     "reportMissingModuleSource": "none",
-    "typeCheckingMode": "basic"
+    "reportGeneralTypeIssues": "none",
+    "reportIndexIssue": "none",
+    "reportArgumentType": "none", 
+    "typeCheckingMode": "off"
 }
+

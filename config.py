@@ -1,7 +1,6 @@
 """
-SentientMarket — Configuration & Client Initialization
-Loads env vars and provides singleton access to OG SDK + MemSync.
-No private key required — wallet connects from the browser.
+SentientMarket — Configuration
+Loads env vars. No SDK dependency — uses direct HTTP x402 calls.
 """
 
 import os
@@ -36,34 +35,7 @@ class Config:
         """Return list of config notes (non-blocking)."""
         notes = []
         if not cls.OG_PRIVATE_KEY:
-            notes.append("OG_PRIVATE_KEY not set — using browser wallet or demo mode")
+            notes.append("OG_PRIVATE_KEY not set — using demo mode")
         if not cls.MEMSYNC_API_KEY or cls.MEMSYNC_API_KEY == "your_memsync_api_key_here":
             notes.append("MEMSYNC_API_KEY not set — using demo memory store")
         return notes
-
-
-def get_og_llm():
-    """Create and return an OpenGradient LLM client (new SDK API).
-
-    The new SDK uses og.LLM(private_key=...) instead of og.Client(...).
-    Wallet needs $OPG tokens on Base Sepolia for x402 payments.
-    """
-    if not Config.OG_PRIVATE_KEY:
-        print("[INFO] No OG_PRIVATE_KEY — dashboard runs in demo mode. Users connect wallets in-browser.")
-        return None
-    try:
-        import opengradient as og
-        llm = og.LLM(private_key=Config.OG_PRIVATE_KEY)
-        # Ensure Permit2 approval for OPG spending
-        try:
-            approval = llm.ensure_opg_approval(opg_amount=5.0)
-            print(f"[OG] Permit2 approval OK — allowance: {approval.allowance_after}")
-        except Exception as e:
-            print(f"[WARN] Permit2 approval failed: {e} — x402 calls may fail")
-        return llm
-    except ImportError:
-        print("[WARN] opengradient not installed — running in demo mode")
-        return None
-    except Exception as e:
-        print(f"[WARN] Failed to init OG LLM: {e} — running in demo mode")
-        return None

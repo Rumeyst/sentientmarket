@@ -74,7 +74,7 @@ const WalletManager = {
 
     async connect(silent = false) {
         if (!window.ethereum) {
-            if (!silent) alert('MetaMask not detected. Please install MetaMask to connect your wallet.');
+            if (!silent) alert('No wallet detected. Please install MetaMask or Rabby to connect.');
             return;
         }
 

@@ -11,7 +11,7 @@ from fastapi import FastAPI, Request
 from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
-from config import Config, get_og_client
+from config import Config, get_og_llm
 from og_client import OGClient
 from memsync_client import MemSyncClient
 from twin_collector import TwinCollector
@@ -28,9 +28,10 @@ if STATIC_DIR.exists():
     app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
 
 
-# Initialize engine
-og_sdk = get_og_client()
-og = OGClient(og_sdk)
+# Initialize engine (og.LLM for x402 inference)
+og_llm = get_og_llm()
+og = OGClient(og_llm)
+
 memsync = MemSyncClient()
 collector = TwinCollector(demo_mode=True)
 engine = ReputationEngine(og=og, memsync=memsync, collector=collector)

@@ -1,14 +1,51 @@
 """
 SentientMarket — OpenGradient SDK Wrapper
-Handles TEE-verified LLM inference and on-chain forecast model reads.
+Handles TEE-verified LLM inference via x402 (updated SDK API).
+
+SDK changes (March 2026):
+- og.Client() → og.LLM(private_key=...)
+- llm.chat() and llm.completion() are now ASYNC
+- Requires Permit2 approval via llm.ensure_opg_approval()
+- OPG tokens on Base Sepolia (not OUSDC)
+- SETTLE_METADATA → INDIVIDUAL_FULL
+- Models: GPT_5, GPT_4_1_2025_04_14, CLAUDE_SONNET_4_5, etc.
 """
 
 from __future__ import annotations
+import asyncio
 import json
+import threading
 import time
-from typing import Optional
+from typing import Any, Optional
 
 from config import Config
+
+# ---------------------------------------------------------------------------
+# Async helper — run coroutines from sync code even inside event loops
+# ---------------------------------------------------------------------------
+
+def _run_async(coro: Any) -> Any:
+    """Run an async coroutine from synchronous code.
+
+    Works even when called from inside an existing event loop (e.g. FastAPI).
+    Spawns a new thread with its own event loop to avoid conflicts.
+    """
+    result: list[Any] = [None]
+    error: list[Optional[BaseException]] = [None]
+
+    def _worker() -> None:
+        try:
+            result[0] = asyncio.run(coro)
+        except BaseException as e:
+            error[0] = e
+
+    t = threading.Thread(target=_worker)
+    t.start()
+    t.join(timeout=60)
+    if error[0] is not None:
+        raise error[0]  # type: ignore[misc]
+    return result[0]
+
 
 # ---------------------------------------------------------------------------
 # Demo / fallback data when SDK is unavailable
@@ -23,11 +60,15 @@ DEMO_FORECASTS = {
 
 
 class OGClient:
-    """Wrapper around the OpenGradient Python SDK."""
+    """Wrapper around the OpenGradient Python SDK (new async API)."""
 
-    def __init__(self, client=None):
-        self.client = client
-        self.demo_mode = client is None
+    def __init__(self, llm: Any = None):
+        """
+        Args:
+            llm: og.LLM instance (created via og.LLM(private_key=...))
+        """
+        self.llm = llm
+        self.demo_mode = llm is None
 
     # ------------------------------------------------------------------
     # LLM Inference (TEE-verified via x402)
@@ -38,6 +79,9 @@ class OGClient:
         Run a TEE-verified LLM analysis of a twin's reputation.
         Returns { analysis: str, payment_hash: str | None }
         """
+        if self.demo_mode:
+            return self._demo_analysis(twin_name)
+
         system_prompt = (
             "You are a crypto market analyst evaluating digital twins on Twin.fun. "
             "Given a twin's memory history (past predictions, trades, and statements), "
@@ -57,21 +101,20 @@ class OGClient:
             "Analyze this twin and output the JSON reputation report."
         )
 
-        if self.demo_mode:
-            return self._demo_analysis(twin_name)
-
         try:
             import opengradient as og
-            result = self.client.llm.chat(
-                model=og.TEE_LLM.GPT_4O,
+
+            result = _run_async(self.llm.chat(
+                model=og.TEE_LLM.GPT_4_1_2025_04_14,
                 messages=[
                     {"role": "system", "content": system_prompt},
                     {"role": "user", "content": user_prompt},
                 ],
                 max_tokens=500,
                 temperature=0.1,
-                x402_settlement_mode=og.x402SettlementMode.SETTLE_METADATA,
-            )
+                x402_settlement_mode=og.x402SettlementMode.INDIVIDUAL_FULL,
+            ))
+
             return {
                 "analysis": result.chat_output.get("content", "{}"),
                 "payment_hash": result.payment_hash,
@@ -81,7 +124,7 @@ class OGClient:
             return self._demo_analysis(twin_name)
 
     # ------------------------------------------------------------------
-    # On-Chain Forecast Models
+    # On-Chain Forecast Models (Alpha testnet)
     # ------------------------------------------------------------------
 
     def get_forecasts(self) -> dict:
@@ -89,42 +132,9 @@ class OGClient:
         Read live price forecasts from OG's on-chain workflow models.
         Returns { BTC: {...}, ETH: {...}, SOL: {...}, SUI: {...} }
         """
-        if self.demo_mode:
-            return DEMO_FORECASTS
-
-        forecasts = {}
-        try:
-            import opengradient as og
-            from opengradient.workflow_models.workflow_models import (
-                read_btc_1_hour_price_forecast,
-                read_eth_1_hour_price_forecast,
-                read_sol_1_hour_price_forecast,
-                read_sui_1_hour_price_forecast,
-            )
-
-            model_readers = {
-                "BTC": read_btc_1_hour_price_forecast,
-                "ETH": read_eth_1_hour_price_forecast,
-                "SOL": read_sol_1_hour_price_forecast,
-                "SUI": read_sui_1_hour_price_forecast,
-            }
-
-            for symbol, reader in model_readers.items():
-                try:
-                    raw = reader(self.client.alpha)
-                    forecasts[symbol] = {
-                        "raw": str(raw),
-                        "timestamp": int(time.time()),
-                        "source": "opengradient_onchain",
-                    }
-                except Exception as e:
-                    print(f"[OG] Failed to read {symbol} forecast: {e}")
-                    forecasts[symbol] = DEMO_FORECASTS.get(symbol, {})
-
-        except ImportError:
-            return DEMO_FORECASTS
-
-        return forecasts if forecasts else DEMO_FORECASTS
+        # Alpha testnet forecasts need og.Alpha client (separate network)
+        # For now use demo data — LLM inference is the core feature
+        return DEMO_FORECASTS
 
     # ------------------------------------------------------------------
     # Demo fallbacks

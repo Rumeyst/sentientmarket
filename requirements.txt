@@ -1,3 +1,4 @@
+opengradient
 requests
 python-dotenv
 fastapi

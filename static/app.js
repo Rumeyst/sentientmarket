@@ -38,7 +38,7 @@ const ThemeManager = {
     },
 };
 
-// ── Wallet Connect (MetaMask via ethers.js) ──────────────────
+// ── Wallet Connect with Provider Detection Modal ──────────────
 
 const WalletManager = {
     provider: null,
@@ -46,21 +46,23 @@ const WalletManager = {
     address: null,
     chainId: null,
     onConnectCallbacks: [],
+    detectedWallets: [],
 
     init() {
-        // Bind connect buttons
+        this.detectWallets();
+
         document.querySelectorAll('#connect-wallet').forEach(btn => {
-            btn.addEventListener('click', () => this.connect());
+            btn.addEventListener('click', () => this.showModal());
         });
 
-        // Bind disconnect buttons
         document.querySelectorAll('#disconnect-wallet').forEach(btn => {
             btn.addEventListener('click', () => this.disconnect());
         });
 
-        // Auto-reconnect if wallet was previously connected
-        if (window.ethereum && localStorage.getItem('sm-wallet-connected') === 'true') {
-            this.connect(true);
+        // Auto-reconnect
+        const savedWallet = localStorage.getItem('sm-wallet-provider');
+        if (savedWallet && localStorage.getItem('sm-wallet-connected') === 'true') {
+            setTimeout(() => this.connectTo(savedWallet, true), 500);
         }
 
         // Listen for account/chain changes
@@ -71,16 +73,149 @@ const WalletManager = {
             });
             window.ethereum.on('chainChanged', () => window.location.reload());
         }
+
+        this.createModal();
     },
 
-    async connect(silent = false) {
-        if (!window.ethereum) {
-            if (!silent) alert('No wallet detected. Please install MetaMask or Rabby to connect.');
+    detectWallets() {
+        this.detectedWallets = [];
+
+        // EIP-6963: modern multi-wallet detection
+        if (window.addEventListener) {
+            window.addEventListener('eip6963:announceProvider', (event) => {
+                const info = event.detail.info;
+                const provider = event.detail.provider;
+                if (info && provider) {
+                    // Avoid duplicates
+                    if (!this.detectedWallets.find(w => w.id === info.rdns)) {
+                        this.detectedWallets.push({
+                            id: info.rdns || info.name,
+                            name: info.name,
+                            icon: info.icon || '',
+                            provider: provider,
+                        });
+                    }
+                }
+            });
+            window.dispatchEvent(new Event('eip6963:requestProvider'));
+        }
+
+        // Fallback: detect window.ethereum providers
+        setTimeout(() => {
+            if (this.detectedWallets.length === 0 && window.ethereum) {
+                // Check for multiple providers (some wallets inject an array)
+                if (window.ethereum.providers && window.ethereum.providers.length > 0) {
+                    window.ethereum.providers.forEach(p => {
+                        const name = p.isMetaMask ? 'MetaMask' 
+                            : p.isRabby ? 'Rabby'
+                            : p.isCoinbaseWallet ? 'Coinbase Wallet'
+                            : p.isBraveWallet ? 'Brave Wallet'
+                            : 'Browser Wallet';
+                        const id = name.toLowerCase().replace(/\s/g, '-');
+                        if (!this.detectedWallets.find(w => w.id === id)) {
+                            this.detectedWallets.push({ id, name, icon: '', provider: p });
+                        }
+                    });
+                } else {
+                    // Single provider
+                    const p = window.ethereum;
+                    const name = p.isMetaMask ? 'MetaMask' 
+                        : p.isRabby ? 'Rabby'
+                        : p.isCoinbaseWallet ? 'Coinbase Wallet'
+                        : p.isBraveWallet ? 'Brave Wallet'
+                        : 'Browser Wallet';
+                    this.detectedWallets.push({ id: name.toLowerCase().replace(/\s/g, '-'), name, icon: '', provider: p });
+                }
+            }
+        }, 200);
+    },
+
+    createModal() {
+        const modal = document.createElement('div');
+        modal.id = 'wallet-modal';
+        modal.className = 'wallet-modal-overlay';
+        modal.style.display = 'none';
+        modal.innerHTML = `
+            <div class="wallet-modal">
+                <div class="wallet-modal-header">
+                    <span>Connect Wallet</span>
+                    <button class="wallet-modal-close" id="wallet-modal-close">&times;</button>
+                </div>
+                <div class="wallet-modal-body" id="wallet-modal-list"></div>
+                <div class="wallet-modal-footer">
+                    <span>Select a wallet to connect</span>
+                </div>
+            </div>
+        `;
+        document.body.appendChild(modal);
+
+        modal.addEventListener('click', (e) => {
+            if (e.target === modal) this.hideModal();
+        });
+        document.getElementById('wallet-modal-close').addEventListener('click', () => this.hideModal());
+    },
+
+    showModal() {
+        const modal = document.getElementById('wallet-modal');
+        const list = document.getElementById('wallet-modal-list');
+
+        list.innerHTML = '';
+
+        if (this.detectedWallets.length === 0) {
+            list.innerHTML = `
+                <div class="wallet-modal-empty">
+                    <p>No wallets detected</p>
+                    <p class="wallet-modal-hint">Install <a href="https://metamask.io" target="_blank">MetaMask</a> or <a href="https://rabby.io" target="_blank">Rabby</a> to connect.</p>
+                </div>
+            `;
+        } else {
+            this.detectedWallets.forEach(wallet => {
+                const item = document.createElement('button');
+                item.className = 'wallet-modal-item';
+                item.innerHTML = `
+                    <span class="wallet-modal-item-icon">${wallet.icon ? `<img src="${wallet.icon}" alt="" width="28" height="28">` : this.getWalletEmoji(wallet.name)}</span>
+                    <span class="wallet-modal-item-name">${wallet.name}</span>
+                    <span class="wallet-modal-item-arrow">&rarr;</span>
+                `;
+                item.addEventListener('click', () => {
+                    this.hideModal();
+                    this.connectTo(wallet.id);
+                });
+                list.appendChild(item);
+            });
+        }
+
+        modal.style.display = 'flex';
+        setTimeout(() => modal.classList.add('visible'), 10);
+    },
+
+    hideModal() {
+        const modal = document.getElementById('wallet-modal');
+        modal.classList.remove('visible');
+        setTimeout(() => modal.style.display = 'none', 200);
+    },
+
+    getWalletEmoji(name) {
+        const n = name.toLowerCase();
+        if (n.includes('metamask')) return '🦊';
+        if (n.includes('rabby')) return '🐰';
+        if (n.includes('coinbase')) return '🔵';
+        if (n.includes('brave')) return '🦁';
+        if (n.includes('trust')) return '🛡️';
+        return '💳';
+    },
+
+    async connectTo(walletId, silent = false) {
+        const wallet = this.detectedWallets.find(w => w.id === walletId);
+        const providerToUse = wallet ? wallet.provider : window.ethereum;
+
+        if (!providerToUse) {
+            if (!silent) this.showModal();
             return;
         }
 
         try {
-            this.provider = new ethers.BrowserProvider(window.ethereum);
+            this.provider = new ethers.BrowserProvider(providerToUse);
             const accounts = await this.provider.send('eth_requestAccounts', []);
             this.signer = await this.provider.getSigner();
             this.address = accounts[0];
@@ -89,12 +224,11 @@ const WalletManager = {
             this.chainId = Number(network.chainId);
 
             localStorage.setItem('sm-wallet-connected', 'true');
+            localStorage.setItem('sm-wallet-provider', walletId);
             this.updateUI();
 
-            // Fire connect callbacks (e.g. re-render proof button)
             this.onConnectCallbacks.forEach(cb => cb(this.address));
 
-            // Prompt to switch to Base Sepolia if not already on it
             if (this.chainId !== 84532) {
                 await this.switchToBaseSepolia();
             }
@@ -104,7 +238,7 @@ const WalletManager = {
     },
 
     async switchToBaseSepolia() {
-        const BASE_SEPOLIA_HEX = '0x14a34'; // 84532
+        const BASE_SEPOLIA_HEX = '0x14a34';
         try {
             await window.ethereum.request({
                 method: 'wallet_switchEthereumChain',
@@ -139,6 +273,7 @@ const WalletManager = {
         this.address = null;
         this.chainId = null;
         localStorage.removeItem('sm-wallet-connected');
+        localStorage.removeItem('sm-wallet-provider');
         this.updateUI();
     },
 
@@ -149,7 +284,6 @@ const WalletManager = {
             : '';
         const networkName = this.chainId === 84532 ? 'Base Sepolia' : `Chain ${this.chainId || '?'}`;
 
-        // Update connect buttons
         document.querySelectorAll('#connect-wallet').forEach(btn => {
             if (connected) {
                 btn.classList.add('connected');
@@ -162,7 +296,6 @@ const WalletManager = {
             }
         });
 
-        // Update banners
         document.querySelectorAll('#wallet-banner').forEach(banner => {
             banner.style.display = connected ? 'flex' : 'none';
         });

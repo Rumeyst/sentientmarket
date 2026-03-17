@@ -4,9 +4,13 @@ Loads env vars. No SDK dependency — uses direct HTTP x402 calls.
 """
 
 import os
+from pathlib import Path
 from dotenv import load_dotenv
 
-load_dotenv()
+# Load .env from the same directory as this file
+_env_path = Path(__file__).resolve().parent / ".env"
+load_dotenv(_env_path)
+print(f"[Config] Loading .env from: {_env_path} (exists: {_env_path.exists()})")
 
 
 class Config:

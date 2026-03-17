@@ -816,6 +816,127 @@ a:hover { text-decoration: underline; }
 .animate-delay-3 { animation-delay: 0.15s; }
 .animate-delay-4 { animation-delay: 0.2s; }
 
+/* ── Wallet Modal ────────────────────────────────────────── */
+.wallet-modal-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.6);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+    opacity: 0;
+    transition: opacity 0.2s;
+}
+
+.wallet-modal-overlay.visible { opacity: 1; }
+
+.wallet-modal {
+    background: var(--bg-1);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    width: 360px;
+    max-width: 90vw;
+    overflow: hidden;
+    transform: scale(0.95);
+    transition: transform 0.2s var(--ease);
+}
+
+.wallet-modal-overlay.visible .wallet-modal { transform: scale(1); }
+
+.wallet-modal-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 16px 20px;
+    border-bottom: 1px solid var(--border);
+    font-size: 0.9rem;
+    font-weight: 700;
+    color: var(--text-0);
+}
+
+.wallet-modal-close {
+    width: 28px;
+    height: 28px;
+    border-radius: 6px;
+    border: 1px solid var(--border);
+    background: var(--bg-2);
+    color: var(--text-2);
+    font-size: 16px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: border-color 0.15s;
+}
+
+.wallet-modal-close:hover { border-color: var(--border-hover); color: var(--text-0); }
+
+.wallet-modal-body {
+    padding: 8px;
+    max-height: 320px;
+    overflow-y: auto;
+}
+
+.wallet-modal-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    width: 100%;
+    padding: 12px;
+    border: none;
+    border-radius: 8px;
+    background: transparent;
+    color: var(--text-0);
+    font-family: var(--font);
+    font-size: 0.85rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.1s;
+    text-align: left;
+}
+
+.wallet-modal-item:hover { background: var(--bg-2); }
+
+.wallet-modal-item-icon {
+    width: 36px;
+    height: 36px;
+    border-radius: 10px;
+    background: var(--bg-3);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 20px;
+    flex-shrink: 0;
+    overflow: hidden;
+}
+
+.wallet-modal-item-icon img { border-radius: 8px; }
+
+.wallet-modal-item-name { flex: 1; }
+
+.wallet-modal-item-arrow {
+    color: var(--text-3);
+    font-size: 0.8rem;
+}
+
+.wallet-modal-footer {
+    padding: 12px 20px;
+    border-top: 1px solid var(--border);
+    text-align: center;
+    font-size: 0.65rem;
+    color: var(--text-3);
+}
+
+.wallet-modal-empty {
+    padding: 32px 20px;
+    text-align: center;
+}
+
+.wallet-modal-empty p { color: var(--text-2); font-size: 0.85rem; }
+.wallet-modal-hint { font-size: 0.72rem; color: var(--text-3); margin-top: 8px; }
+.wallet-modal-hint a { color: var(--accent); }
+
 @media (prefers-reduced-motion: reduce) {
     *, *::before, *::after {
         animation-duration: 0.01ms !important;

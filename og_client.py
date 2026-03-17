@@ -12,10 +12,12 @@ Users need OPG tokens on Base Sepolia to pay for inference.
 
 from __future__ import annotations
 import asyncio
+import hashlib
 import json
 import os
 import time
 import threading
+from pathlib import Path
 from typing import Any, Optional
 
 from config import Config
@@ -102,14 +104,25 @@ class OGClient:
                 # Create LLM client on the background loop so httpx binds there
                 self.llm = _run_async(self._create_llm())
                 self.demo_mode = False
-                print("[OG] ✅ SDK initialized — live mode")
+
+                # Print wallet address for debugging
+                try:
+                    from eth_account import Account
+                    acct = Account.from_key(self.private_key)
+                    print(f"[OG] ✅ SDK initialized — live mode")
+                    print(f"[OG]    Wallet: {acct.address}")
+                    print(f"[OG]    Faucet: https://faucet.opengradient.ai")
+                except Exception:
+                    print("[OG] ✅ SDK initialized — live mode")
 
                 # Try to approve OPG spending (may fail if no ETH for gas)
                 try:
-                    self.llm.ensure_opg_approval(opg_amount=5)
-                    print("[OG] ✅ OPG approval confirmed")
+                    self.llm.ensure_opg_approval(opg_amount=100)
+                    print("[OG] ✅ OPG approval confirmed (100 OPG)")
                 except Exception as e:
-                    print(f"[WARN] OPG approval failed: {e} — x402 calls may still work if previously approved")
+                    print(f"[WARN] OPG approval failed: {e}")
+                    print("[WARN] This likely means the wallet needs Base Sepolia ETH for gas")
+                    print("[WARN] Get some at: https://faucet.opengradient.ai")
 
             except Exception as e:
                 print(f"[WARN] SDK init failed: {e} — running demo mode")
@@ -131,9 +144,18 @@ class OGClient:
         """
         Run a TEE-verified LLM analysis of a twin's reputation.
         Returns { analysis: str, payment_hash: str }
+        Uses disk cache to avoid paying for the same twin twice.
         """
+        # Check cache first
+        cached = self._load_cache(twin_name)
+        if cached:
+            print(f"[OG] Cache hit for {twin_name} — skipping inference")
+            return cached
+
         if self.demo_mode:
-            return self._demo_analysis(twin_name)
+            result = self._demo_analysis(twin_name)
+            self._save_cache(twin_name, result)
+            return result
 
         user_prompt = (
             f"Digital Twin: {twin_name}\n\n"
@@ -195,11 +217,54 @@ class OGClient:
             }
 
         except Exception as e:
-            import traceback
+            # If 402 Payment Required, try re-approving OPG and retry once
+            if '402' in str(e) and self.llm and not getattr(self, '_retried_approval', False):
+                print("[OG] 402 — re-approving OPG spending and retrying...")
+                try:
+                    self.llm.ensure_opg_approval(opg_amount=100)
+                    self._retried_approval = True
+                    result = self.analyze_twin(twin_name, memory_context)
+                    self._retried_approval = False
+                    return result
+                except Exception as retry_err:
+                    print(f"[OG] Retry also failed: {retry_err}")
+                    self._retried_approval = False
+
             print(f"[OG] x402 inference failed: {e}")
-            traceback.print_exc()
             print("[OG] Falling back to demo")
-            return self._demo_analysis(twin_name)
+            result = self._demo_analysis(twin_name)
+            self._save_cache(twin_name, result)
+            return result
+
+    # ------------------------------------------------------------------
+    # Disk Cache (saves OPG by not re-calling for same twin)
+    # ------------------------------------------------------------------
+
+    CACHE_DIR = Path(__file__).resolve().parent / ".cache"
+
+    def _cache_key(self, twin_name: str) -> str:
+        return twin_name.lower().replace(' ', '_')
+
+    def _load_cache(self, twin_name: str) -> Optional[dict]:
+        path = self.CACHE_DIR / f"{self._cache_key(twin_name)}.json"
+        if path.exists():
+            try:
+                data = json.loads(path.read_text(encoding='utf-8'))
+                # Cache valid for 24 hours
+                if time.time() - data.get('_cached_at', 0) < 86400:
+                    return {k: v for k, v in data.items() if not k.startswith('_')}
+            except Exception:
+                pass
+        return None
+
+    def _save_cache(self, twin_name: str, result: dict):
+        try:
+            self.CACHE_DIR.mkdir(exist_ok=True)
+            path = self.CACHE_DIR / f"{self._cache_key(twin_name)}.json"
+            data = {**result, '_cached_at': time.time()}
+            path.write_text(json.dumps(data, indent=2), encoding='utf-8')
+        except Exception as e:
+            print(f"[OG] Cache write failed: {e}")
 
     # ------------------------------------------------------------------
     # On-Chain Forecast Models

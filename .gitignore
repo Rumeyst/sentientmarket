@@ -43,3 +43,7 @@ node_modules/
 
 # LLM result cache
 .cache/
+
+# Personal notes
+demo_script.md
+threads.md

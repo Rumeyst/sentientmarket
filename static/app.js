@@ -478,7 +478,7 @@ const loadTwinDetail = async () => {
             proofEl.style.opacity = '1';
             proofEl.style.color = 'var(--green)';
         } else {
-            proofEl.textContent = '🔒 Demo mode — set OG_PRIVATE_KEY for live proofs';
+            proofEl.textContent = '⚡ Analysis generated locally — TEE proofs available with OPG tokens';
             proofEl.removeAttribute('href');
             proofEl.style.cursor = 'default';
             proofEl.style.opacity = '0.6';

@@ -115,7 +115,17 @@ async def api_health():
 
 @app.get("/{full_path:path}", response_class=HTMLResponse)
 async def spa_catch_all(full_path: str):
-    """Serve index.html for all non-API routes so React Router handles them."""
+    """Serve static files if they exist, otherwise serve index.html for React Router."""
+    # Check if the path maps to a real file in static/ (logo.png, favicon.ico, etc.)
+    if full_path:
+        file_path = STATIC_DIR / full_path
+        if file_path.is_file() and ".." not in full_path:
+            import mimetypes
+            mime_type = mimetypes.guess_type(str(file_path))[0] or "application/octet-stream"
+            from fastapi.responses import Response
+            return Response(content=file_path.read_bytes(), media_type=mime_type)
+
+    # Fall back to SPA index.html
     html_path = STATIC_DIR / "index.html"
     if html_path.exists():
         return HTMLResponse(content=html_path.read_text(encoding="utf-8"))

@@ -224,13 +224,15 @@ class ReputationEngine:
     def score_twin(self, twin_id: str, force_refresh: bool = False) -> Optional[dict]:
         """
         Produce a full reputation score for a twin.
-        Returns {
-            twin, accuracy, forecasts, ai_analysis, payment_hash, 
-            explorer_url, scored_at
-        }
+        Caches results for 5 minutes to avoid burning OPG on every page load.
         """
-        if twin_id in self._cache and not force_refresh:
-            return self._cache[twin_id]
+
+        # Return cached result if fresh enough (5 min TTL)
+        CACHE_TTL = 300  # 5 minutes
+        if not force_refresh and twin_id in self._cache:
+            cached = self._cache[twin_id]
+            if time.time() - cached.get("scored_at", 0) < CACHE_TTL:
+                return cached
 
         twin = self.collector.get_twin(twin_id)
         if not twin:
@@ -266,13 +268,11 @@ class ReputationEngine:
         # Build proof info
         payment_hash = result.get("payment_hash", "")
         tee_verified = result.get("tee_verified", False)
-        is_demo = not payment_hash or payment_hash.startswith("0xDEMO_")
-        is_onchain_tx = payment_hash.startswith("0x") and len(payment_hash) >= 66 and not is_demo
+        is_fake = not payment_hash or payment_hash.startswith("0xDEMO_") or payment_hash.startswith("0xTEE_")
         
-        if is_onchain_tx:
-            explorer_url = f"https://explorer.opengradient.ai/tx/{payment_hash}"
-        elif tee_verified and not is_demo:
-            explorer_url = f"tee://{payment_hash[:16]}"  # TEE proof, no explorer link
+        # Only real 64+ char hashes get explorer links (Base Sepolia)
+        if not is_fake and len(payment_hash) >= 64:
+            explorer_url = f"https://sepolia.basescan.org/tx/{payment_hash}"
         else:
             explorer_url = ""
 

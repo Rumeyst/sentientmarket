@@ -24,8 +24,11 @@ from reputation_engine import ReputationEngine
 app = FastAPI(title="SentientMarket", version="0.1.0")
 
 STATIC_DIR = Path(os.environ.get("STATIC_DIR", str(Path(__file__).parent / "static")))
-if STATIC_DIR.exists():
-    app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
+ASSETS_DIR = STATIC_DIR / "assets"
+
+# Mount /assets for JS/CSS bundles from the React build
+if ASSETS_DIR.exists():
+    app.mount("/assets", StaticFiles(directory=str(ASSETS_DIR)), name="assets")
 
 
 # Initialize engine (SDK handles x402 internally when available)
@@ -43,24 +46,6 @@ async def startup():
         print(f"[Server] Config notes: {issues}")
     engine.initialize()
     print(f"[Server] SentientMarket ready! (demo_mode={og.demo_mode})")
-
-
-# ---------------------------------------------------------------------------
-# Pages
-# ---------------------------------------------------------------------------
-
-@app.get("/", response_class=HTMLResponse)
-async def index():
-    """Serve the main dashboard."""
-    html_path = STATIC_DIR / "index.html"
-    return HTMLResponse(content=html_path.read_text(encoding="utf-8"))
-
-
-@app.get("/twin/{twin_id}", response_class=HTMLResponse)
-async def twin_page(twin_id: str):
-    """Serve the twin detail page."""
-    html_path = STATIC_DIR / "twin.html"
-    return HTMLResponse(content=html_path.read_text(encoding="utf-8"))
 
 
 # ---------------------------------------------------------------------------
@@ -114,13 +99,27 @@ async def api_network():
 
 @app.get("/api/health")
 async def api_health():
-    """Health check."""
+    """Health check with detailed SDK status."""
+    status = og.get_status()
     return JSONResponse(content={
         "status": "ok",
-        "demo_mode": og.demo_mode,
+        "og_sdk": status,
         "memsync_demo": memsync.demo_mode,
         "twins_loaded": len(collector.get_all_twins()),
     })
+
+
+# ---------------------------------------------------------------------------
+# SPA catch-all  (must come AFTER all /api routes)
+# ---------------------------------------------------------------------------
+
+@app.get("/{full_path:path}", response_class=HTMLResponse)
+async def spa_catch_all(full_path: str):
+    """Serve index.html for all non-API routes so React Router handles them."""
+    html_path = STATIC_DIR / "index.html"
+    if html_path.exists():
+        return HTMLResponse(content=html_path.read_text(encoding="utf-8"))
+    return HTMLResponse(content="<h1>Build the frontend first</h1>", status_code=404)
 
 
 # ---------------------------------------------------------------------------
